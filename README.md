@@ -24,6 +24,33 @@ model that is hosted by **llm‑router** at `http://192.168.100.65:8080`.*
 
 > This is a significant change because the default Ollama agent can only connect to the host from which it is launched.
 
+**Manual Build Guide**
+
+**Manual Build Guide for Ollama (English)**
+
+Actually, You need to build a binary version of Ollama manually. A Go compiler and prerequisites are required
+
+**Prerequisites**  
+
+| Tool                | Minimum version | Install command (examples)                                     |
+|---------------------|-----------------|----------------------------------------------------------------|
+| **Go**              | 1.22+           | `sudo apt-get install golang`  <br> `brew install go`          |
+| **CMake**           | 3.20+           | `sudo apt-get install cmake` <br> `brew install cmake`         |
+| **Git**             | any             | `sudo apt-get install git` <br> `brew install git`             |
+| **Make** (optional) | any             | Usually pre‑installed on Linux/macOS                           |
+| **gcc/clang**       | any             | `sudo apt-get install build-essential` <br> `brew install gcc` |
+
+If you have the compiler and the dependencies required by Ollama, run the `make‑local‑ollama.sh` script:
+
+```shell script
+#!/bin/bash
+
+cmake -B build
+cmake --build build
+
+go build -o ollama .
+```
+
 
 ---
 
