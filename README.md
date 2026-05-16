@@ -4,6 +4,29 @@
   </a>
 </p>
 
+---
+
+# Important note
+This is not the official Ollama repository; it is an experimental fork where we add integration of coding agents 
+with any providers and models that support tool calling. Currently, integration with any provider is possible through 
+**llm‑router** (https://github.com/radlab-dev-group/llm-router) for the Claude agent.
+
+
+**Example usage**  
+
+```shell script
+ANTHROPIC_BASE_URL="http://192.168.100.65:8080" \
+  ./ollama launch claude --model qwen3.6:35b
+```
+
+*This command runs the Claude agent using the **qwen3.6:35b** 
+model that is hosted by **llm‑router** at `http://192.168.100.65:8080`.*
+
+> This is a significant change because the default Ollama agent can only connect to the host from which it is launched.
+
+
+---
+
 # Ollama
 
 Start building with open models.
