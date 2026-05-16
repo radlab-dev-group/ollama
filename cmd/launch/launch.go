@@ -274,6 +274,7 @@ func LaunchCmd(checkServerHeartbeat func(cmd *cobra.Command, args []string) erro
 	var configFlag bool
 	var yesFlag bool
 	var restoreFlag bool
+	var useConfigFlag string
 
 	cmd := &cobra.Command{
 		Use:   "launch [INTEGRATION] [-- [EXTRA_ARGS...]]",
@@ -285,29 +286,30 @@ Flags and extra arguments require an integration name.
 
 Supported integrations:
   claude          Claude Code
-  codex-app       Codex App (aliases: codex-desktop, codex-gui)
-  hermes          Hermes Agent
-  openclaw        OpenClaw (aliases: clawdbot, moltbot)
-  opencode        OpenCode
+  claude-desktop Claude Desktop (aliases: claude-app)
+  cline           Cline
   codex           Codex
   copilot         Copilot CLI (aliases: copilot-cli)
   droid           Droid
+  hermes          Hermes Agent
   kimi            Kimi Code CLI
+  opencode        OpenCode
+  openclaw        OpenClaw (aliases: clawdbot, moltbot)
   pi              Pi
   pool            Pool
-  cline           Cline
   vscode          VS Code (aliases: code)
 
 Examples:
   ollama launch
   ollama launch claude
   ollama launch claude --model <model>
-  ollama launch codex-app
-  ollama launch codex-app --restore
+  ollama launch claude-desktop
+  ollama launch claude-desktop --restore
   ollama launch hermes
   ollama launch droid --config (does not auto-launch)
   ollama launch codex -- -p myprofile (pass extra args to integration)
-  ollama launch codex -- --sandbox workspace-write`,
+  ollama launch codex -- --sandbox workspace-write
+  ollama launch codex --use-config=/path/to/config.toml (use a custom codex config file)`,
 		Args: cobra.ArbitraryArgs,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if restoreFlag || launchCommandCanSkipHeartbeat(args) {
@@ -343,15 +345,11 @@ Examples:
 			}
 
 			if name == "" {
-				if cmd.Flags().Changed("model") || cmd.Flags().Changed("config") || cmd.Flags().Changed("yes") || cmd.Flags().Changed("restore") || len(passArgs) > 0 {
+				if cmd.Flags().Changed("model") || cmd.Flags().Changed("config") || cmd.Flags().Changed("yes") || cmd.Flags().Changed("restore") || cmd.Flags().Changed("use-config") || len(passArgs) > 0 {
 					return fmt.Errorf("flags and extra args require an integration name, for example: 'ollama launch claude --model qwen3.5'")
 				}
 				runTUI(cmd)
 				return nil
-			}
-
-			if !restoreFlag && launchCommandIsClaudeDesktop(name) {
-				return errClaudeDesktopUnsupported()
 			}
 
 			if modelFlag != "" && isCloudModelName(modelFlag) {
@@ -371,6 +369,9 @@ Examples:
 						forceConfigure = false
 					}
 				}
+			}
+			if useConfigFlag != "" {
+				passArgs = append(passArgs, "--use-config="+useConfigFlag)
 			}
 			err := LaunchIntegration(cmd.Context(), IntegrationLaunchRequest{
 				Name:           name,
@@ -392,6 +393,7 @@ Examples:
 	cmd.Flags().BoolVar(&configFlag, "config", false, "Configure without launching")
 	cmd.Flags().BoolVar(&restoreFlag, "restore", false, "Restore an integration to its default profile")
 	cmd.Flags().BoolVarP(&yesFlag, "yes", "y", false, "Automatically answer yes to confirmation prompts")
+	cmd.Flags().StringVar(&useConfigFlag, "use-config", "", "Use a custom codex config file")
 	return cmd
 }
 
@@ -399,12 +401,8 @@ func launchCommandCanSkipHeartbeat(args []string) bool {
 	if len(args) == 0 {
 		return false
 	}
-	return launchCommandIsClaudeDesktop(args[0])
-}
-
-func launchCommandIsClaudeDesktop(name string) bool {
-	canonical, _, err := LookupIntegration(name)
-	return err == nil && canonical == claudeDesktopIntegrationName
+	name, _, err := LookupIntegration(args[0])
+	return err == nil && name == "claude-desktop"
 }
 
 type launcherClient struct {
@@ -465,10 +463,6 @@ func LaunchIntegration(ctx context.Context, req IntegrationLaunchRequest) error 
 	name, runner, err := LookupIntegration(req.Name)
 	if err != nil {
 		return err
-	}
-
-	if name == claudeDesktopIntegrationName && !req.Restore {
-		return errClaudeDesktopUnsupported()
 	}
 
 	policy := launchIntegrationPolicy(req)
@@ -772,13 +766,7 @@ func (c *launcherClient) launchManagedSingleIntegration(ctx context.Context, nam
 		return nil
 	}
 
-	// current is the live managed app config; target may come from saved launch
-	// state. Rewrite when the live config is missing or has drifted so the app
-	// config converges with the model which launch is about to use.
-	liveConfigMissing := current == ""
-	liveConfigDrifted := current != "" && target != current
-	configured := false
-	if needsConfigure || req.ModelOverride != "" || liveConfigMissing || liveConfigDrifted || !savedMatchesModels(saved, []string{target}) {
+	if needsConfigure || req.ModelOverride != "" || (current != "" && target != current) || !savedMatchesModels(saved, []string{target}) {
 		configureModels, err := c.managedSingleConfigureModels(ctx, managed, target)
 		if err != nil {
 			return err
@@ -791,7 +779,6 @@ func (c *launcherClient) launchManagedSingleIntegration(ctx context.Context, nam
 				return err
 			}
 		}
-		configured = true
 	}
 
 	if !managedIntegrationOnboarded(saved, managed) {
@@ -800,12 +787,6 @@ func (c *launcherClient) launchManagedSingleIntegration(ctx context.Context, nam
 		}
 		if err := managed.Onboard(); err != nil {
 			return err
-		}
-	}
-
-	if configured {
-		if !printConfigurationSuccess(managed) {
-			printRestoreHint(managed)
 		}
 	}
 
@@ -957,7 +938,7 @@ func (c *launcherClient) resolveSingleIntegrationTarget(ctx context.Context, run
 		}
 	}
 
-	if needsConfigure && req.ModelOverride == "" {
+	if needsConfigure {
 		selected, err := c.selectSingleModelWithSelectorReady(ctx, fmt.Sprintf("Select model for %s:", runner), target, DefaultSingleSelector, !skipReadiness)
 		if err != nil {
 			return "", false, err
