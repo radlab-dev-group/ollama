@@ -26,8 +26,6 @@ model that is hosted by **llm‑router** at `http://192.168.100.65:8080`.*
 
 **Manual Build Guide**
 
-**Manual Build Guide for Ollama (English)**
-
 Actually, You need to build a binary version of Ollama manually. A Go compiler and prerequisites are required
 
 **Prerequisites**  
