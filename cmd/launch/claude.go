@@ -55,19 +55,16 @@ func (c *Claude) Run(model string, args []string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	// Use system ANTHROPIC_BASE_URL if set, otherwise fall back to local Ollama host.
-	baseURL := envconfig.Host().String()
-	if url := os.Getenv("ANTHROPIC_BASE_URL"); url != "" {
-		baseURL = url
-	}
-
-	cmd.Env = append(os.Environ(),
-		"ANTHROPIC_BASE_URL="+baseURL,
+	env := append(os.Environ(),
+		"ANTHROPIC_BASE_URL="+envconfig.Host().String(),
 		"ANTHROPIC_API_KEY=",
 		"ANTHROPIC_AUTH_TOKEN=ollama",
 		"CLAUDE_CODE_ATTRIBUTION_HEADER=0",
 	)
-	cmd.Env = append(cmd.Env, c.modelEnvVars(model)...)
+
+	env = append(env, c.modelEnvVars(model)...)
+
+	cmd.Env = env
 	return cmd.Run()
 }
 
