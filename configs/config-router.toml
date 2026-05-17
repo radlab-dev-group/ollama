@@ -1,0 +1,15 @@
+[profiles.ollama-launch]
+openai_base_url = "http://192.168.100.65:8080/v1/"
+forced_login_method = "api"
+model_provider = "ollama-launch"
+[profiles.ollama-launch.features]
+terminal_resize_reflow = true
+memories = false
+external_migration = false
+prevent_idle_sleep = false
+[model_providers.ollama-launch]
+name = "LLMRouter"
+base_url = "http://192.168.100.65:8080/v1/"
+
+[tui.model_availability_nux]
+"gpt-5.5" = 4
